@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "HyperCloud.IIS", "HyperCloud.IIS", "{375587D0-DAD2-481B-A619-1DEB26A9B4CE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HyperCloud.IIS.RedisSessionState", "HyperCloud.IIS.RedisSessionState\HyperCloud.IIS.RedisSessionState.csproj", "{8B58CE70-75BF-423E-9CD6-CE2FECD0DE08}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8B58CE70-75BF-423E-9CD6-CE2FECD0DE08}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8B58CE70-75BF-423E-9CD6-CE2FECD0DE08}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8B58CE70-75BF-423E-9CD6-CE2FECD0DE08}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8B58CE70-75BF-423E-9CD6-CE2FECD0DE08}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{8B58CE70-75BF-423E-9CD6-CE2FECD0DE08} = {375587D0-DAD2-481B-A619-1DEB26A9B4CE}
+	EndGlobalSection
+EndGlobal
