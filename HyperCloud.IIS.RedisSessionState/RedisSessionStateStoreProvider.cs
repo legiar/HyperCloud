@@ -100,7 +100,6 @@ namespace HyperCloud.IIS
                 };
 
                 redis.Set(GetKey(id), data, new TimeSpan(0, timeout, 0));
-                redis.IncrementValue(GetKey(id) + "_counter");
                 // TODO: initialize empty {key}_items
             }
         }
@@ -204,7 +203,6 @@ namespace HyperCloud.IIS
                     using (var writeRedis = SingleRedisPool.GetClient())
                     {
                         writeRedis.Set(key, data, _timeout);
-                        writeRedis.IncrementValue(GetKey(id) + "_counter");
                     }
 
                     actionFlags = (SessionStateActions)data.ActionFlag;
@@ -251,7 +249,6 @@ namespace HyperCloud.IIS
                     using (var writeRedis = SingleRedisPool.GetClient())
                     {
                         writeRedis.Set(key, item);
-                        writeRedis.IncrementValue(GetKey(id) + "_counter");
                     }
                 }
             }
@@ -291,7 +288,6 @@ namespace HyperCloud.IIS
                 string key = GetKey(id);
                 redis.Set(key, data, new TimeSpan(0, item.Timeout, 0));
                 redis.Set(key + "_items", Serialize((SessionStateItemCollection)item.Items));
-                redis.IncrementValue(GetKey(id) + "_counter");
             }
         }
 
