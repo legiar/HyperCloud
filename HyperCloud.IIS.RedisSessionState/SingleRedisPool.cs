@@ -35,12 +35,12 @@ namespace HyperCloud.IIS.RedisSessionState
 
 		public static IRedisClient GetClient()
 		{
-            return GetPool().GetReadOnlyClient();
+            return GetPool().GetClient();
 		}
 
-        public static IRedisClient GetWriteClient()
+        public static IRedisClient GetReadOnlyClient()
         {
-            return GetPool().GetClient();
+            return GetPool().GetReadOnlyClient();
         }
 	}
 }

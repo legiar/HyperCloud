@@ -88,7 +88,7 @@ namespace HyperCloud.IIS
 
         public override void CreateUninitializedItem(System.Web.HttpContext context, string id, int timeout)
         {
-            using (var redis = SingleRedisPool.GetClient())
+            using (var redis = SingleRedisPool.GetReadOnlyClient())
             {
                 var data = new SessionItem
                 {
@@ -128,54 +128,50 @@ namespace HyperCloud.IIS
                 _timeout);
             */
 
-            using (var redis = SingleRedisPool.GetClient())
+            using (var redis = SingleRedisPool.GetReadOnlyClient())
             {
-                var key = this.GetKey(id);
-
-                var data = redis.Get<SessionItem>(key);
-
-                if (data != null)
+                var key = GetKey(id);
+                SessionItem data = redis.Get<SessionItem>(key);
+                if (data == null)
                 {
-                    if (!data.Locked)
+                    return null;
+                }
+
+                if (!data.Locked)
+                {
+                    data.LockId++;
+                    data.SetTime = DateTime.Now;
+
+                    using (var writeRedis = SingleRedisPool.GetClient())
                     {
-                        data.LockId++;
-                        data.SetTime = DateTime.Now;
+                        writeRedis.Set(key, data, _timeout);
+                    }
 
-                        using (var writeRedis = SingleRedisPool.GetWriteClient())
-                        {
-                            writeRedis.Set(key, data, _timeout);
-                        }
+                    actionFlags = (SessionStateActions)data.ActionFlag;
+                    lockId = data.LockId;
+                    lockAge = data.LockAge;
 
-                        actionFlags = (SessionStateActions)data.ActionFlag;
-                        lockId = data.LockId;
-                        lockAge = data.LockAge;
-
-                        if (actionFlags == SessionStateActions.InitializeItem)
-                        {
-                            item = this.CreateNewStoreData(context, (int)_timeout.TotalMinutes);
-                        }
-                        else
-                        {
-                            byte[] content = redis.Get<byte[]>(key + "_items");
-                            item = this.Deserialize(context, content, (int)_timeout.TotalMinutes);
-                        }
-
-                        return item;
+                    if (actionFlags == SessionStateActions.InitializeItem)
+                    {
+                        item = this.CreateNewStoreData(context, (int)_timeout.TotalMinutes);
                     }
                     else
                     {
-                        lockAge = data.LockAge;
-                        locked = true;
-                        lockId = data.LockId;
-                        actionFlags = (SessionStateActions)data.ActionFlag;
-
                         byte[] content = redis.Get<byte[]>(key + "_items");
-                        return this.Deserialize(context, content, (int)_timeout.TotalMinutes);
+                        item = this.Deserialize(context, content, (int)_timeout.TotalMinutes);
                     }
+
+                    return item;
                 }
                 else
                 {
-                    return item;
+                    lockAge = data.LockAge;
+                    locked = true;
+                    lockId = data.LockId;
+                    actionFlags = (SessionStateActions)data.ActionFlag;
+
+                    byte[] content = redis.Get<byte[]>(key + "_items");
+                    return this.Deserialize(context, content, (int)_timeout.TotalMinutes);
                 }
             }
         }
@@ -190,66 +186,61 @@ namespace HyperCloud.IIS
             locked = false;
             actionFlags = 0;
 
-            using (var redis = SingleRedisPool.GetClient())
+            using (var redis = SingleRedisPool.GetReadOnlyClient())
             {
                 var key = this.GetKey(id);
+                SessionItem data = redis.Get<SessionItem>(key);
 
-                var data = redis.Get<SessionItem>(key);
-
-                if (data != null)
+                if (data == null)
                 {
-                    if (!data.Locked)
+                    return null;
+                }
+                if (!data.Locked)
+                {
+                    data.LockId++;
+                    data.SetTime = DateTime.Now;
+                    data.Locked = true;
+
+                    using (var writeRedis = SingleRedisPool.GetClient())
                     {
-                        data.LockId++;
-                        data.SetTime = DateTime.Now;
-                        data.Locked = true;
+                        writeRedis.Set(key, data, _timeout);
+                        writeRedis.IncrementValue(GetKey(id) + "_counter");
+                    }
 
-                        using (var writeRedis = SingleRedisPool.GetWriteClient())
-                        {
-                            writeRedis.Set(key, data, _timeout);
-                            writeRedis.IncrementValue(GetKey(id) + "_counter");
-                        }
+                    actionFlags = (SessionStateActions)data.ActionFlag;
+                    lockId = data.LockId;
+                    lockAge = data.LockAge;
 
-                        actionFlags = (SessionStateActions)data.ActionFlag;
-                        lockId = data.LockId;
-                        lockAge = data.LockAge;
-
-                        if (actionFlags == SessionStateActions.InitializeItem)
-                        {
-                            item = this.CreateNewStoreData(context, (int)_timeout.TotalMinutes);
-                        }
-                        else
-                        {
-                            byte[] content = redis.Get<byte[]>(key + "_items");
-                            item = this.Deserialize(context, content, (int)_timeout.TotalMinutes);
-                        }
-
-                        return item;
+                    if (actionFlags == SessionStateActions.InitializeItem)
+                    {
+                        item = this.CreateNewStoreData(context, (int)_timeout.TotalMinutes);
                     }
                     else
                     {
-                        lockAge = data.LockAge;
-                        locked = true;
-                        lockId = data.LockId;
-                        actionFlags = (SessionStateActions)data.ActionFlag;
-
                         byte[] content = redis.Get<byte[]>(key + "_items");
-                        return this.Deserialize(context, content, (int)_timeout.TotalMinutes);
+                        item = this.Deserialize(context, content, (int)_timeout.TotalMinutes);
                     }
+
+                    return item;
                 }
                 else
                 {
-                    return item;
+                    lockAge = data.LockAge;
+                    locked = true;
+                    lockId = data.LockId;
+                    actionFlags = (SessionStateActions)data.ActionFlag;
+
+                    byte[] content = redis.Get<byte[]>(key + "_items");
+                    return this.Deserialize(context, content, (int)_timeout.TotalMinutes);
                 }
             }
         }
 
         public override void ReleaseItemExclusive(System.Web.HttpContext context, string id, object lockId)
         {
-            using (var redis = SingleRedisPool.GetClient())
+            using (var redis = SingleRedisPool.GetReadOnlyClient())
             {
                 var key = this.GetKey(id);
-
                 var item = redis.Get<SessionItem>(key);
 
                 if (item != null)
@@ -257,7 +248,7 @@ namespace HyperCloud.IIS
                     item.Locked = false;
                     item.LockId = (int)lockId;
 
-                    using (var writeRedis = SingleRedisPool.GetWriteClient())
+                    using (var writeRedis = SingleRedisPool.GetClient())
                     {
                         writeRedis.Set(key, item);
                         writeRedis.IncrementValue(GetKey(id) + "_counter");
@@ -268,7 +259,7 @@ namespace HyperCloud.IIS
 
         public override void RemoveItem(System.Web.HttpContext context, string id, object lockId, SessionStateStoreData item)
         {
-            using (var redis = SingleRedisPool.GetWriteClient())
+            using (var redis = SingleRedisPool.GetClient())
             {
                 redis.Remove(this.GetKey(id));
             }
@@ -276,7 +267,7 @@ namespace HyperCloud.IIS
 
         public override void ResetItemTimeout(System.Web.HttpContext context, string id)
         {
-            using (var redis = SingleRedisPool.GetWriteClient())
+            using (var redis = SingleRedisPool.GetClient())
             {
                 var item = redis.GetValue(this.GetKey(id));
                 if (!String.IsNullOrEmpty(item))
@@ -288,7 +279,7 @@ namespace HyperCloud.IIS
 
         public override void SetAndReleaseItemExclusive(System.Web.HttpContext context, string id, SessionStateStoreData item, object lockId, bool newItem)
         {
-            using (var redis = SingleRedisPool.GetWriteClient())
+            using (var redis = SingleRedisPool.GetClient())
             {
                 var data = new SessionItem
                 {
