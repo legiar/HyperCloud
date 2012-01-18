@@ -9,7 +9,6 @@ using System.Web.Configuration;
 using System.Reflection;
 using System.IO;
 using ServiceStack.Redis;
-using Newtonsoft.Json;
 
 namespace HyperCloud.IIS
 {
@@ -33,12 +32,6 @@ namespace HyperCloud.IIS
 
     public sealed class RedisSessionStateStoreProvider : SessionStateStoreProviderBase
     {
-        static JsonSerializerSettings _jss = new JsonSerializerSettings
-        {
-            TypeNameHandling = TypeNameHandling.All,
-            TypeNameAssemblyFormat = FormatterAssemblyStyle.Simple
-        };
-        
         private static object _mutex = new object();
         private bool _initialized = false;
         private ISessionIDManager _sessionIDManager;
@@ -165,8 +158,6 @@ namespace HyperCloud.IIS
                         {
                             byte[] content = redis.Get<byte[]>(key + "_items");
                             item = this.Deserialize(context, content, (int)_timeout.TotalMinutes);
-                            //string content = redis.GetValue(key + "_items");
-                            //item = JsonConvert.DeserializeObject<SessionStateStoreData>(content, _jss);
                         }
 
                         return item;
@@ -180,8 +171,6 @@ namespace HyperCloud.IIS
 
                         byte[] content = redis.Get<byte[]>(key + "_items");
                         return this.Deserialize(context, content, (int)_timeout.TotalMinutes);
-                        //string content = redis.GetValue(key + "_items");
-                        //return JsonConvert.DeserializeObject<SessionStateStoreData>(content, _jss);
                     }
                 }
                 else
@@ -233,8 +222,6 @@ namespace HyperCloud.IIS
                         {
                             byte[] content = redis.Get<byte[]>(key + "_items");
                             item = this.Deserialize(context, content, (int)_timeout.TotalMinutes);
-                            //string content = redis.GetValue(key + "_items");
-                            //item = JsonConvert.DeserializeObject<SessionStateStoreData>(content, _jss);
                         }
 
                         return item;
@@ -248,8 +235,6 @@ namespace HyperCloud.IIS
 
                         byte[] content = redis.Get<byte[]>(key + "_items");
                         return this.Deserialize(context, content, (int)_timeout.TotalMinutes);
-                        //string content = redis.GetValue(key + "_items");
-                        //return JsonConvert.DeserializeObject<SessionStateStoreData>(content, _jss);
                     }
                 }
                 else
@@ -315,8 +300,6 @@ namespace HyperCloud.IIS
                 string key = GetKey(id);
                 redis.Set(key, data, new TimeSpan(0, item.Timeout, 0));
                 redis.Set(key + "_items", Serialize((SessionStateItemCollection)item.Items));
-                //string content = JsonConvert.SerializeObject((SessionStateItemCollection)item.Items, Formatting.None, _jss);
-                //redis.SetEntry(key + "_items", content);
                 redis.IncrementValue(GetKey(id) + "_counter");
             }
         }
