@@ -88,7 +88,7 @@ namespace HyperCloud.IIS
 
         public override void CreateUninitializedItem(System.Web.HttpContext context, string id, int timeout)
         {
-            using (var redis = SingleRedisPool.GetReadOnlyClient())
+            using (var redis = SingleRedisPool.GetClient())
             {
                 var data = new SessionItem
                 {
