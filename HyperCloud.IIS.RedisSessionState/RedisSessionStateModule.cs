@@ -6,8 +6,9 @@ using System.Collections;
 using System.Threading;
 using System.Web.Configuration;
 using System.Configuration;
-using BookSleeve;
 using System.Threading.Tasks;
+
+using ServiceStack.Redis;
 
 namespace HyperCloud.IIS
 {
@@ -25,7 +26,7 @@ namespace HyperCloud.IIS
 
 		private bool _releaseCalled = false;
 
-		private RedisConnection _redis;
+        private PooledRedisClientManager _redis;
 		private string _host;
 		private int _port = 6379;
 
@@ -53,19 +54,15 @@ namespace HyperCloud.IIS
 						  WebConfigurationManager.OpenWebConfiguration(System.Web.Hosting.HostingEnvironment.ApplicationVirtualPath);
 						_config = (SessionStateSection)webConfig.GetSection("system.web/sessionState");
 
-						var stateConnection = _config.StateConnectionString;
-
-						if (!String.IsNullOrWhiteSpace(stateConnection)) {
-							var stateConnectionParts = stateConnection.Split('=', ':');
-							_host = stateConnectionParts.ElementAtOrDefault(1) ?? "localhost";
-							var portAsString = stateConnectionParts.ElementAtOrDefault(2) ?? "6379";
-							_port = Int32.Parse(portAsString);
-						}
-						else {
-							_host = "localhost";
-							_port = 6379;
-						}
-						_redis = new RedisConnection(_host, _port);
+                        var stateConnection = _config.StateConnectionString;
+                        var connectionValues = new ConnectionString(stateConnection);
+                        RedisClientManagerConfig redisConfig = new RedisClientManagerConfig();
+                        redisConfig.MaxReadPoolSize = 100;
+                        redisConfig.MaxWritePoolSize = 100;
+                        string[] redisWriteServers = new string[] { connectionValues.Host };
+                        string[] redisReadServers = new string[] { connectionValues.Host };
+                        _redis = new PooledRedisClientManager(redisWriteServers, redisReadServers, redisConfig, connectionValues.DB);
+                        //_redis.RedisClientFactory = 
 
 						_timeout = (int)_config.Timeout.TotalMinutes;
 						_cookieMode = _config.Cookieless;
@@ -76,7 +73,7 @@ namespace HyperCloud.IIS
 			}
 		}
 
-		private RedisConnection GetRedisConnection()
+		/*private RedisConnection GetRedisConnection()
 		{
 			if (_redis.NeedsReset())
             {
@@ -93,7 +90,7 @@ namespace HyperCloud.IIS
 				}
 			}
 			return _redis;
-		}
+		}*/
 
 		public void Dispose()
 		{
@@ -116,7 +113,7 @@ namespace HyperCloud.IIS
 			bool isNew = false;
 			string sessionId;
 
-			RedisSessionItemHash sessionItemCollection = null;
+			RedisSessionItems sessionItemCollection = null;
 			bool supportSessionIDReissue = true;
 
 			_sessionIDManager.InitializeRequest(context, false, out supportSessionIDReissue);
@@ -144,7 +141,7 @@ namespace HyperCloud.IIS
 
 			_releaseCalled = false;
 
-			sessionItemCollection = new RedisSessionItemHash(sessionId, _timeout, GetRedisConnection());
+			sessionItemCollection = new RedisSessionItems(sessionId, _timeout, _redis);
 
 			if (sessionItemCollection.Count == 0)
             {
@@ -189,9 +186,9 @@ namespace HyperCloud.IIS
 			}
 			else
             {
-				stateContainer.SessionItems.PersistChangedReferences();
+				//stateContainer.SessionItems.PersistChangedReferences();
 			}
-			Task.WaitAll(stateContainer.SessionItems.SetTasks.ToArray(), 1500);
+			//Task.WaitAll(stateContainer.SessionItems.SetTasks.ToArray(), 1500);
 			SessionStateUtility.RemoveHttpSessionStateFromContext(context);
 		}
 
