@@ -5,6 +5,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "HyperCloud.IIS", "HyperClou
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HyperCloud.IIS.RedisSessionState", "HyperCloud.IIS.RedisSessionState\HyperCloud.IIS.RedisSessionState.csproj", "{8B58CE70-75BF-423E-9CD6-CE2FECD0DE08}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HyperCloud.Core", "HyperCloud.Core\HyperCloud.Core.csproj", "{A2444EF6-2B81-4DBA-A408-E724907E8F05}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{8B58CE70-75BF-423E-9CD6-CE2FECD0DE08}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8B58CE70-75BF-423E-9CD6-CE2FECD0DE08}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8B58CE70-75BF-423E-9CD6-CE2FECD0DE08}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A2444EF6-2B81-4DBA-A408-E724907E8F05}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A2444EF6-2B81-4DBA-A408-E724907E8F05}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A2444EF6-2B81-4DBA-A408-E724907E8F05}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A2444EF6-2B81-4DBA-A408-E724907E8F05}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
