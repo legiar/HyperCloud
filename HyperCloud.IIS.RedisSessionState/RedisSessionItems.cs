@@ -172,7 +172,10 @@ namespace HyperCloud.IIS.RedisSessionState
             {
                 using (var redis = SingleRedisPool.GetReadOnlyClient())
                 {
-                    foreach (string name in redis.GetHashKeys(_key))
+                    var client = redis.GetTypedClient<byte[]>();
+                    var hash = client.GetHash<string>(_key);
+
+                    foreach (string name in hash.Keys)
                     {
                         BaseAdd(name, null);
                     }
