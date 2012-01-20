@@ -28,8 +28,8 @@ namespace HyperCloud.IIS.RedisSessionState
         };
 
         private string _key;
-        private bool _keysLoaded = false;
-        private HashSet<string> _loaded = new HashSet<string>();
+        private bool _allKeysLoaded = false;
+        private HashSet<string> _nameCache = new HashSet<string>();
         private IValueSerializer _serializer = new ClrBinarySerializer();
 
         //public IList<Task> _tasks { get; private set; }
@@ -166,7 +166,7 @@ namespace HyperCloud.IIS.RedisSessionState
 
         private void AddKeysToBase()
         {
-            if (!_keysLoaded)
+            if (!_allKeysLoaded)
             {
                 using (var redis = SingleRedisPool.GetReadOnlyClient())
                 {
@@ -180,7 +180,7 @@ namespace HyperCloud.IIS.RedisSessionState
 
 		private object Get(string name)
 		{
-            if (!_loaded.Contains(name)) {
+            if (!_nameCache.Contains(name)) {
                 AddKeysToBase();
                 using (var redis = SingleRedisPool.GetReadOnlyClient())
                 {
@@ -218,7 +218,7 @@ namespace HyperCloud.IIS.RedisSessionState
                         }
                         BaseSet(name, value);
                     //}
-                    _loaded.Add(name);
+                    _nameCache.Add(name);
                 }
             }
             object val = BaseGet(name);
@@ -227,7 +227,7 @@ namespace HyperCloud.IIS.RedisSessionState
 
         public void SaveAll()
         {
-            foreach (var name in BaseGetAllKeys())
+            foreach (var name in _nameCache)
             {
                 var value = BaseGet(name);
                 if (value != null)
@@ -287,14 +287,14 @@ namespace HyperCloud.IIS.RedisSessionState
                 var hash1 = client1.GetHash<string>(_key);
                 hash1[name + "_debug"] = raw;
             }
-            if (!_loaded.Contains(name))
+            if (!_nameCache.Contains(name))
             {
                 if (BaseGetAllKeys().Contains(name)) {
                     BaseSet(name, value);
                 } else {
                     BaseAdd(name, value);
                 }
-                _loaded.Add(name);
+                _nameCache.Add(name);
             }
             else
             {
