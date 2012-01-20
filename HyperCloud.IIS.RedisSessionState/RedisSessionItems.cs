@@ -77,7 +77,9 @@ namespace HyperCloud.IIS.RedisSessionState
         {
             using (var redis = SingleRedisPool.GetClient())
             {
-                redis.RemoveEntryFromHash(_key, name);
+                var client = redis.GetTypedClient<byte[]>();
+                var hash = client.GetHash<string>(_key);
+                hash.Remove(name);
             }
             BaseRemove(name);
         }
