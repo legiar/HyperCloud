@@ -245,7 +245,7 @@ namespace HyperCloud.IIS.RedisSessionState
                         formatter.Serialize(stream, value);
                         data = stream.ToArray();
                     }
-                    var raw = JsonConvert.SerializeObject(value, Formatting.None, _jss);
+                    //var raw = JsonConvert.SerializeObject(value, Formatting.None, _jss);
 
                     using (var redis = SingleRedisPool.GetClient())
                     {
@@ -253,9 +253,9 @@ namespace HyperCloud.IIS.RedisSessionState
                         var hash = client.GetHash<string>(_key);
                         hash[name] = data;
 
-                        var client1 = redis.GetTypedClient<string>();
-                        var hash1 = client1.GetHash<string>(_key);
-                        hash1[name + "_debug"] = raw;
+                        //var client1 = redis.GetTypedClient<string>();
+                        //var hash1 = client1.GetHash<string>(_key);
+                        //hash1[name + "_debug"] = raw;
                     }
                 }
             }
@@ -280,7 +280,7 @@ namespace HyperCloud.IIS.RedisSessionState
                 //}
                 data = stream.ToArray();
             }
-            var raw = JsonConvert.SerializeObject(value, Formatting.None, _jss);
+            //var raw = JsonConvert.SerializeObject(value, Formatting.None, _jss);
 
             using (var redis = SingleRedisPool.GetClient())
             {
@@ -288,9 +288,9 @@ namespace HyperCloud.IIS.RedisSessionState
                 var hash = client.GetHash<string>(_key);
                 hash[name] = data;
 
-                var client1 = redis.GetTypedClient<string>();
-                var hash1 = client1.GetHash<string>(_key);
-                hash1[name + "_debug"] = raw;
+                //var client1 = redis.GetTypedClient<string>();
+                //var hash1 = client1.GetHash<string>(_key);
+                //hash1[name + "_debug"] = raw;
             }
             if (!_nameCache.Contains(name))
             {
