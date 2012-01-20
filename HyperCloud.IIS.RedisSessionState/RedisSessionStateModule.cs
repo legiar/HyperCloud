@@ -26,9 +26,11 @@ namespace HyperCloud.IIS
 
 		private bool _releaseCalled = false;
 
-        private PooledRedisClientManager _redis;
-		private string _host;
-		private int _port = 6379;
+        public event EventHandler Start;
+
+        public RedisSessionStateModule()
+        {
+        }
 
         // IHttpModule.Init
 		public void Init(HttpApplication app)
@@ -39,7 +41,6 @@ namespace HyperCloud.IIS
                 {
 					if (!_initialized)
                     {
-			
 						// Add event handlers.
 						app.AcquireRequestState += new EventHandler(this.OnAcquireRequestState);
 						app.ReleaseRequestState += new EventHandler(this.OnReleaseRequestState);
@@ -51,18 +52,10 @@ namespace HyperCloud.IIS
 						
 						// Get the configuration section and set timeout and CookieMode values.
 						Configuration webConfig = 
-						  WebConfigurationManager.OpenWebConfiguration(System.Web.Hosting.HostingEnvironment.ApplicationVirtualPath);
+						    WebConfigurationManager.OpenWebConfiguration(System.Web.Hosting.HostingEnvironment.ApplicationVirtualPath);
 						_config = (SessionStateSection)webConfig.GetSection("system.web/sessionState");
 
-                        var stateConnection = _config.StateConnectionString;
-                        var connectionValues = new ConnectionString(stateConnection);
-                        RedisClientManagerConfig redisConfig = new RedisClientManagerConfig();
-                        redisConfig.MaxReadPoolSize = 100;
-                        redisConfig.MaxWritePoolSize = 100;
-                        string[] redisWriteServers = new string[] { connectionValues.Host };
-                        string[] redisReadServers = new string[] { connectionValues.Host };
-                        _redis = new PooledRedisClientManager(redisWriteServers, redisReadServers, redisConfig, connectionValues.DB);
-                        //_redis.RedisClientFactory = 
+                        SingleRedisPool.ConnectionString = new ConnectionString(_config.StateConnectionString);
 
 						_timeout = (int)_config.Timeout.TotalMinutes;
 						_cookieMode = _config.Cookieless;
@@ -73,28 +66,8 @@ namespace HyperCloud.IIS
 			}
 		}
 
-		/*private RedisConnection GetRedisConnection()
-		{
-			if (_redis.NeedsReset())
-            {
-                lock (_mutex)
-                {
-					if (_redis.NeedsReset())
-                    {
-						_redis = new RedisConnection(_host, _port);
-						_redis.Closed += (object sender, EventArgs e) => {
-							//Debug.WriteLine("redisConnection closed");
-						};
-						_redis.Open();
-					}
-				}
-			}
-			return _redis;
-		}*/
-
 		public void Dispose()
 		{
-			_redis.Dispose();
 		}
 
 		private bool RequiresSessionState(HttpContextBase context)
@@ -113,7 +86,7 @@ namespace HyperCloud.IIS
 			bool isNew = false;
 			string sessionId;
 
-			RedisSessionItems sessionItemCollection = null;
+            RedisSessionItems sessionItems = null;
 			bool supportSessionIDReissue = true;
 
 			_sessionIDManager.InitializeRequest(context, false, out supportSessionIDReissue);
@@ -127,7 +100,6 @@ namespace HyperCloud.IIS
 				_sessionIDManager.SaveSessionID(context, sessionId, out redirected, out cookieAdded);
 
 				isNew = true;
-
                 if (redirected)
                 {
                     return;
@@ -141,16 +113,16 @@ namespace HyperCloud.IIS
 
 			_releaseCalled = false;
 
-			sessionItemCollection = new RedisSessionItems(sessionId, _timeout, _redis);
+            sessionItems = new RedisSessionItems(sessionId, _timeout);
 
-			if (sessionItemCollection.Count == 0)
+            if (sessionItems.Count == 0)
             {
 				isNew = true;
 			}
 			
 			// Add the session data to the current HttpContext.
-			SessionStateUtility.AddHttpSessionStateToContext(context, new RedisHttpSessionStateContainer(sessionId,
-	            sessionItemCollection, SessionStateUtility.GetSessionStaticObjects(context), _timeout,
+			SessionStateUtility.AddHttpSessionStateToContext(context, new RedisHttpSessionStateContainer(sessionId, sessionItems, 
+                SessionStateUtility.GetSessionStaticObjects(context), _timeout,
 	            isNew, _cookieMode, SessionStateMode.Custom, false));
 
 			// Execute the Session_OnStart event for a new session.
@@ -159,8 +131,6 @@ namespace HyperCloud.IIS
 				Start(this, EventArgs.Empty);
 			}
 		}
-
-		public event EventHandler Start;
 
 		private void OnReleaseRequestState(object source, EventArgs args)
 		{
@@ -175,7 +145,7 @@ namespace HyperCloud.IIS
 			_releaseCalled = true;
 
 			// Read the session state from the context
-			var stateContainer = (RedisHttpSessionStateContainer)SessionStateUtility.GetHttpSessionStateFromContext(context);
+			var stateContainer = (RedisHttpSessionStateContainer)(SessionStateUtility.GetHttpSessionStateFromContext(context));
 
 			// If Session.Abandon() was called, remove the session data from the local Hashtable
 			// and execute the Session_OnEnd event from the Global.asax file.
@@ -188,6 +158,8 @@ namespace HyperCloud.IIS
             {
 				//stateContainer.SessionItems.PersistChangedReferences();
 			}
+            stateContainer.SessionItems.SaveAll();
+
 			//Task.WaitAll(stateContainer.SessionItems.SetTasks.ToArray(), 1500);
 			SessionStateUtility.RemoveHttpSessionStateFromContext(context);
 		}

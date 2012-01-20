@@ -1,63 +1,85 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.Specialized;
+using System.Linq;
 using System.Data;
 using System.Web.SessionState;
-using ServiceStack.Redis;
-//using Newtonsoft.Json;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+
+using ServiceStack.Redis;
+using System.Text;
+
+using Newtonsoft.Json;
 
 namespace HyperCloud.IIS.RedisSessionState
 {
     // : NameObjectCollectionBase
-	public sealed class RedisSessionItems : ISessionStateItemCollection
+    public sealed class RedisSessionItems : NameObjectCollectionBase, ISessionStateItemCollection
 	{
-		private PooledRedisClientManager _redis;
+        private JsonSerializerSettings _jss = new JsonSerializerSettings {
+            TypeNameHandling = TypeNameHandling.All,
+            TypeNameAssemblyFormat = FormatterAssemblyStyle.Simple
+        };
+
+        private string _key;
+        private bool _keysLoaded = false;
+        private HashSet<string> _loaded = new HashSet<string>();
+        private IValueSerializer _serializer = new ClrBinarySerializer();
+
+        //public IList<Task> _tasks { get; private set; }
+
 		private string _sessionId;
 		private int _timeout;
-        private bool _isDirty;
 
-        private ClrBinarySerializer serializer;
-
-        public RedisSessionItems(string sessionId, int timeout, PooledRedisClientManager redis)
+        public RedisSessionItems(string sessionId, int timeout)
 			: base()
 		{
-			this._sessionId = sessionId;
-			this._timeout = timeout;
-			this._redis = redis;
+			_sessionId = sessionId;
+            _key = "session:" + _sessionId;
+			_timeout = timeout;
 
-            this._isDirty = false;
-
-            serializer = new ClrBinarySerializer();
+            //_tasks = new List<Task>();
 		}
 
         #region ISessionStateItemCollection Members
 
         public void Clear()
         {
+            using (var redis = SingleRedisPool.GetClient())
+            {
+                redis.Remove(_key);
+            }
+            BaseClear();
         }
 
         public bool Dirty
         {
-            get { return _isDirty; }
-            set { _isDirty = value; }
+            get { return false; }
+            set { }
         }
 
         public System.Collections.Specialized.NameObjectCollectionBase.KeysCollection Keys
         {
             get
             {
-                throw new NotImplementedException();
+                AddKeysToBase();
+                return base.Keys;
             }
         }
 
         public void Remove(string name)
         {
-            string key = GetKey(name);
-            _redis.Remove(name);
+            using (var redis = SingleRedisPool.GetClient())
+            {
+                redis.RemoveEntryFromHash(_key, name);
+            }
+            BaseRemove(name);
         }
 
         public void RemoveAt(int index)
@@ -100,7 +122,10 @@ namespace HyperCloud.IIS.RedisSessionState
 
         public int Count
         {
-            get { throw new NotImplementedException(); }
+            get {
+                AddKeysToBase();
+                return base.Count;
+            }
         }
 
         public bool IsSynchronized
@@ -120,54 +145,166 @@ namespace HyperCloud.IIS.RedisSessionState
         public System.Collections.IEnumerator GetEnumerator()
         {
             throw new NotImplementedException();
+            /*AddKeysToBase();
+            using (var redis = SingleRedisPool.GetReadOnlyClient())
+            {
+                IDictionary<string, string> raw = redis.GetAllEntriesFromHash(_key);
+                foreach (var item in raw)
+                {
+                    if (!_loaded.Contains(item.Key)) {
+                        byte[] data = Encoding.UTF8.GetBytes(item.Value);
+                        var value = _serializer.Deserialize(data);
+                        BaseSet(item.Key, value);
+                        _loaded.Add(item.Key);
+                    }
+                }
+            }
+            return base.GetEnumerator();*/
         }
 
         #endregion
 
-        private string GetKey(string key)
+        private void AddKeysToBase()
         {
-            return "session:" + _sessionId + ":" + key;
+            if (!_keysLoaded)
+            {
+                using (var redis = SingleRedisPool.GetReadOnlyClient())
+                {
+                    foreach (string name in redis.GetHashKeys(_key))
+                    {
+                        BaseAdd(name, null);
+                    }
+                }
+            }
         }
 
 		private object Get(string name)
 		{
-            string key = GetKey(name);
-            object value = null;
-            using (var client = _redis.GetReadOnlyClient())
-            {
-                //var json = client.GetValue(key);
-                //if (json != null && json != "")
-                //{
-                //    value = JsonConvert.DeserializeObject(json, _jss);
-                //}
-                //byte[] bytes = client.Get<byte[]>(key);
-                //if (bytes != null && bytes.Length != 0)
-                //{
-                    //value = serializer.Deserialize(bytes);
-                    //var formatter = new BinaryFormatter();
-                    //using (var stream = new MemoryStream(bytes))
+            if (!_loaded.Contains(name)) {
+                AddKeysToBase();
+                using (var redis = SingleRedisPool.GetReadOnlyClient())
+                {
+                    // TODO: Maybe not need check if exists? (see BaseSet - ???)
+                    //if (redis.HashContainsEntry(_key, name))
                     //{
-                    //    value = formatter.Deserialize(stream);
+                        //string raw = redis.GetValueFromHash(_key, name);
+                        //byte[] data = Encoding.UTF8.GetBytes(raw);
+
+                        //var value = _serializer.Deserialize(data);
+
+                        //var value = JsonConvert.DeserializeObject(raw);
+
+                        //byte[] data = Encoding.UTF8.GetBytes(raw);
+                        var client = redis.GetTypedClient<byte[]>();
+                        var hash = client.GetHash<string>(_key);
+                        var data = hash[name];
+                        object value = null;
+                        if (data != null && data.Length > 0)
+                        {
+                            //var items = new SessionStateItemCollection();
+                            using (var stream = new MemoryStream(data))
+                            {
+                                //if (stream.Length > 0)
+                                //{
+                                //    using (var reader = new BinaryReader(stream))
+                                //    {
+                                //        items = SessionStateItemCollection.Deserialize(reader);
+                                //    }
+                                //}
+                                var formatter = new BinaryFormatter();
+                                value = formatter.Deserialize(stream);
+                                //value = items[name];
+                            }
+                        }
+                        BaseSet(name, value);
                     //}
-                //}
+                    _loaded.Add(name);
+                }
             }
-            return value;
+            object val = BaseGet(name);
+            return val;
 		}
+
+        public void SaveAll()
+        {
+            foreach (var name in BaseGetAllKeys())
+            {
+                var value = BaseGet(name);
+                if (value != null)
+                {
+                    byte[] data = null;
+                    using (var stream = new MemoryStream())
+                    {
+                        var formatter = new BinaryFormatter();
+
+                        formatter.Serialize(stream, value);
+                        data = stream.ToArray();
+                    }
+                    var raw = JsonConvert.SerializeObject(value, Formatting.None, _jss);
+
+                    using (var redis = SingleRedisPool.GetClient())
+                    {
+                        var client = redis.GetTypedClient<byte[]>();
+                        var hash = client.GetHash<string>(_key);
+                        hash[name] = data;
+
+                        var client1 = redis.GetTypedClient<string>();
+                        var hash1 = client1.GetHash<string>(_key);
+                        hash1[name + "_debug"] = raw;
+                    }
+                }
+            }
+        }
 
 		private void Set(string name, object value)
 		{
-            string key = GetKey(name);
-            using (var client = _redis.GetClient()) {
-                //var json = JsonConvert.SerializeObject(value, Formatting.None, _jss);
-                //client.SetEntry(key, json);
-                //byte[] bytes = serializer.Serialize(value);
+            AddKeysToBase();
 
+            //var items = new SessionStateItemCollection();
+            //items[name] = value;
+
+            byte[] data = null;
+            using (var stream = new MemoryStream())
+            {
                 var formatter = new BinaryFormatter();
-                using (var stream = new MemoryStream())
+                formatter.Serialize(stream, value);
+                //using (var writer = new BinaryWriter(stream))
+                //{
+                //    items.Serialize(writer);
+                //    writer.Close();
+                //}
+                data = stream.ToArray();
+            }
+            var raw = JsonConvert.SerializeObject(value, Formatting.None, _jss);
+
+            using (var redis = SingleRedisPool.GetClient())
+            {
+                var client = redis.GetTypedClient<byte[]>();
+                var hash = client.GetHash<string>(_key);
+                hash[name] = data;
+
+                var client1 = redis.GetTypedClient<string>();
+                var hash1 = client1.GetHash<string>(_key);
+                hash1[name + "_debug"] = raw;
+            }
+            if (!_loaded.Contains(name))
+            {
+                if (BaseGetAllKeys().Contains(name)) {
+                    BaseSet(name, value);
+                } else {
+                    BaseAdd(name, value);
+                }
+                _loaded.Add(name);
+            }
+            else
+            {
+                if (BaseGetAllKeys().Contains(name))
                 {
-                    formatter.Serialize(stream, value);
-                    byte[] bytes = stream.GetBuffer();
-                    client.Set<byte[]>(key, bytes);
+                    BaseSet(name, value);
+                }
+                else
+                {
+                    BaseAdd(name, value);
                 }
             }
 		}

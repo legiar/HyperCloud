@@ -14,7 +14,7 @@ namespace HyperCloud.IIS.RedisSessionState
             private set;
         }
 
-		public RedisHttpSessionStateContainer(string id, RedisSessionItems sessionItems,
+        public RedisHttpSessionStateContainer(string id, RedisSessionItems sessionItems,
             HttpStaticObjectsCollection staticObjects, int timeout, bool newSession, HttpCookieMode cookieMode,
             SessionStateMode mode, bool isReadonly)
 			: base(id, sessionItems, staticObjects, timeout, newSession, cookieMode, mode, isReadonly)
