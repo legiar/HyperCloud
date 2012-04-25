@@ -1,3 +1,11 @@
-*.suo
-*\bin
-*\obj
+*.sassc
+.sass-cache
+.rspec
+/.bundle
+/vendor/bundle
+/log/*
+/tmp/*
+/db/*.sqlite3
+/db/schema.rb
+**.orig
+/config/*.yml
